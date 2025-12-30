@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tracklist Tool | Rekordbox 7</title>
+    <style>
+        :root {
+            --primary: #00f2ff;
+            --accent: #7000ff;
+            --bg: #050505;
+            --card: rgba(255, 255, 255, 0.03);
+            --border: rgba(255, 255, 255, 0.1);
+        }
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            background-color: var(--bg);
+            background-image: radial-gradient(circle at 50% -20%, #1a1a2e 0%, #050505 80%);
+            color: #e0e0e0;
+            margin: 0; padding: 2rem;
+            display: flex; justify-content: center;
+            min-height: 100vh;
+            background-attachment: fixed;
+            background-size: cover;
+        }
+        .app-container { width: 100%; max-width: 1000px; display: grid; grid-template-columns: 1fr 1fr; gap: 3rem; }
+        @media (max-width: 850px) { .app-container { grid-template-columns: 1fr; } }
+
+        .glass-panel {
+            background: var(--card);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border);
+            padding: 2rem; border-radius: 24px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+            height: fit-content;
+        }
+        h1 { font-weight: 900; letter-spacing: -2px; color: var(--primary); margin: 0; font-size: 2.5rem; }
+
+        #drop-zone {
+            border: 2px dashed rgba(0, 242, 255, 0.2);
+            padding: 40px 20px; text-align: center; border-radius: 20px;
+            cursor: pointer; margin: 1.5rem 0;
+            background: rgba(255,255,255,0.02);
+            transition: 0.3s;
+        }
+        #drop-zone:hover { border-color: var(--primary); background: rgba(0, 242, 255, 0.08); }
+
+        #output {
+            margin-top: 1.5rem; background: #000; padding: 1.2rem;
+            border-radius: 12px; white-space: pre-wrap; display: none;
+            font-family: 'Fira Code', monospace; font-size: 0.9rem;
+            border: 1px solid var(--border); max-height: 400px; overflow-y: auto;
+            color: #fff; line-height: 1.5;
+        }
+        .btn {
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            color: black; border: none; padding: 1rem; border-radius: 12px;
+            font-weight: 800; cursor: pointer; width: 100%; margin-top: 1rem;
+        }
+
+        .manual h2 { color: white; font-size: 1.5rem; margin-top: 0; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+        .step { margin-bottom: 1.5rem; position: absolute; position: relative; padding-left: 3rem; }
+        .step::before {
+            content: attr(data-step);
+            position: absolute; left: 0; top: 0;
+            width: 2rem; height: 2rem;
+            background: var(--primary); color: black;
+            border-radius: 50%; display: flex;
+            align-items: center; justify-content: center;
+            font-weight: 900;
+        }
+        .step b { color: var(--primary); display: block; margin-bottom: 4px; }
+        .step p { margin: 0; font-size: 0.9rem; color: #aaa; }
+        code { background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; color: #fff; }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <div class="glass-panel">
+        <h1>Tracklist<br>Tool</h1>
+        <p style="color:#666;">Optimized for Rekordbox 7 History</p>
+
+        <div id="drop-zone" onclick="document.getElementById('fileInput').click()">
+            <b>Drop .m3u8 here</b>
+            <input type="file" id="fileInput" hidden accept=".m3u8">
+        </div>
+
+        <div id="output"></div>
+        <button id="copyBtn" class="btn" style="display:none;">COPY TRACKLIST</button>
+    </div>
+
+    <div class="manual">
+        <h2>Manual: USB to Global History</h2>
+
+        <div class="step" data-step="1">
+            <b>Update Collection</b>
+            <p>Connect your USB. Right-click the USB drive name and select <code>Update Collection</code>. This syncs your gig data.</p>
+        </div>
+
+        <div class="step" data-step="2">
+            <b>Switch to Global History</b>
+            <p>In the left-hand sidebar (Browser), scroll up past your Playlists and look for the <code>History</code> icon.</p>
+        </div>
+
+        <div class="step" data-step="3">
+            <b>Find your Set</b>
+            <p>Expand the Year/Month folders. Your USB set will appear here with the date and time you synced the USB.</p>
+        </div>
+
+        <div class="step" data-step="4">
+            <b>Export M3U8</b>
+            <p>Right-click the specific history session > <code>Export a playlist to a file</code> > <code>M3U8 (*.m3u8)</code>.</p>
+        </div>
+
+        <div style="background: rgba(112, 0, 255, 0.1); border-left: 3px solid var(--accent); padding: 1.2rem; border-radius: 8px; font-size: 0.85rem; margin-top:20px;">
+            <strong>Info:</strong> If the tracks were played for less than 60 seconds, Rekordbox might not log them.
+        </div>
+    </div>
+</div>
+
+<script>
+    const fileInput = document.getElementById('fileInput');
+    const output = document.getElementById('output');
+    const copyBtn = document.getElementById('copyBtn');
+    const dropZone = document.getElementById('drop-zone');
+
+    function processM3U8(text) {
+        const lines = text.split(/\r?\n/);
+        let finalTracks = [];
+
+        for (let i = 0; i < lines.length; i++) {
+            let line = lines[i].trim();
+            if (line.startsWith('#EXTINF:')) {
+                // Find everything after the duration (after the comma)
+                const commaIndex = line.indexOf(',');
+                if (commaIndex !== -1) {
+                    let trackName = line.substring(commaIndex + 1).trim();
+                    finalTracks.push(trackName);
+                    // Skip the very next line (the local file path)
+                    i++; 
+                }
+            }
+        }
+        return finalTracks;
+    }
+
+    function renderOutput(tracks) {
+        if (tracks.length > 0) {
+            output.innerText = tracks.map((t, i) => `${(i + 1).toString().padStart(2, '0')}. ${t}`).join('\n');
+            output.style.display = 'block';
+            copyBtn.style.display = 'block';
+        } else {
+            alert("No tracks found. Check your file content!");
+        }
+    }
+
+    fileInput.addEventListener('change', e => {
+        const reader = new FileReader();
+        reader.onload = (ev) => renderOutput(processM3U8(ev.target.result));
+        reader.readAsText(e.target.files[0]);
+    });
+
+    copyBtn.onclick = () => {
+        navigator.clipboard.writeText(output.innerText);
+        copyBtn.innerText = "COPIED!";
+        setTimeout(() => copyBtn.innerText = "COPY TRACKLIST", 2000);
+    };
+
+    ['dragover', 'dragleave', 'drop'].forEach(name => {
+        dropZone.addEventListener(name, e => {
+            e.preventDefault();
+            dropZone.style.borderColor = name === 'dragover' ? '#00f2ff' : 'rgba(0, 242, 255, 0.2)';
+        });
+    });
+    dropZone.addEventListener('drop', e => {
+        const reader = new FileReader();
+        reader.onload = (ev) => renderOutput(processM3U8(ev.target.result));
+        reader.readAsText(e.dataTransfer.files[0]);
+    });
+</script>
+
+</body>
+</html>
